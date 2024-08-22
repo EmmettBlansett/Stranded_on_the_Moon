@@ -33,7 +33,7 @@ PLAYER_PROJECTILES = 1
 BULLET_COLOR = RED
 BULLET_RADIUS = 5
 BULLET_SPEED = 8
-BULLET_DAMAGE = 5
+BULLET_DAMAGE = 1
 FIRE_RATE = 30  # Higher = slower firing rate (frames per shot)
 
 # Enemy settings
@@ -52,11 +52,11 @@ SCORE = 0
 
 
 # Timer and XP system
-TIME_LIMIT = 15
+TIME_LIMIT = 20
 XP = 0
 LEVEL = 1
 XP_THRESH = 10  # Initial XP threshold
-XP_THRESH_CONSTANT = 10
+XP_THRESH_CONSTANT = 20
 
 # Function to calculate the circular movement
 def get_position_on_spiral(center_x, center_y, radius, angle):
@@ -78,10 +78,11 @@ class Bullet:
         self.size = size
         self.color = color
         self.pierce = pierce
+        self.velocity = [math.cos(self.angle), math.sin(self.angle)]
     
     def move(self):
-        self.x += self.speed * math.cos(self.angle)
-        self.y += self.speed * math.sin(self.angle)
+        self.x += self.speed * self.velocity[0]
+        self.y += self.speed * self.velocity[1]
     
     def draw(self):
         pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.size)
@@ -101,6 +102,7 @@ class Enemy:
         self.color = SQUARE_COLOR
         self.collisions = set()
         self.rand = random.random()
+        self.x, self.y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], self.radius, self.angle)
         self.apply_effect()
     
     def apply_effect(self):
@@ -122,27 +124,27 @@ class Enemy:
     def move(self):
         self.angle += self.speed
         self.radius -= self.spiral_speed
+        if self.angle >= 2*math.pi:
+            self.angle -= 2*math.pi
+        self.x, self.y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], self.radius, self.angle)
     
     def draw(self):
-        x, y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], self.radius, self.angle)
-        pygame.draw.circle(screen, self.color, (x, y), SQUARE_SIZE//2)
-        self.draw_health(x, y)
+        pygame.draw.circle(screen, self.color, (self.x, self.y), SQUARE_SIZE//2)
+        self.draw_health(self.x, self.y)
 
     def draw_health(self, x, y):
         health_text = font.render(str(self.health), True, WHITE)
         screen.blit(health_text, (x - health_text.get_width() // 2, y - health_text.get_height() // 2))
 
     def check_collision(self, bullet):
-        x, y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], self.radius, self.angle)
-        distance = math.hypot(bullet.x - x, bullet.y - y)
+        distance = math.hypot(bullet.x - self.x, bullet.y - self.y)
         return distance < SQUARE_SIZE // 2 + BULLET_RADIUS and bullet.num not in self.collisions
 
     def add_collision(self, bullet_num):
         self.collisions.add(bullet_num)
 
     def check_player_collision(self):
-        x, y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], self.radius, self.angle)
-        distance = math.hypot(x - PLAYER_POS[0], y - PLAYER_POS[1])
+        distance = math.hypot(self.x - PLAYER_POS[0], self.y - PLAYER_POS[1])
         return distance < SQUARE_SIZE // 2 + PLAYER_RADIUS
 
 class Player:
@@ -153,14 +155,16 @@ class Player:
         self.xp = XP
         self.level = LEVEL
         self.xp_thresh = XP_THRESH
+        self.xp_thresh_mult = 1
         self.damage = BULLET_DAMAGE
         self.pierce = 0
         self.projectile_speed = BULLET_SPEED
-        self.mouse_aiming = False
+        self.mouse_aim = False
+        self.auto_aim = False
         self.spread = 1
         self.upgrade_choices = {"Increase Projectiles":self.increase_projectiles, "Increase Rate of Fire":self.increase_rof, 
                                   "Increase Damage":self.increase_damage, "Increase Pierce": self.increase_pierce, 
-                                  "Increase Projectile Speed":self.increase_projectile_speed, "Enable Mouse Aiming":self.enable_mouse_aiming,
+                                  "Increase Projectile Speed":self.increase_projectile_speed, "Enable Mouse Aiming":self.enable_mouse_aim,
                                   "Reduce Spread":self.reduce_spread}
 
     def increase_damage(self, amount = 1):
@@ -176,14 +180,33 @@ class Player:
         if self.projectile_speed >= 16:
             del self.upgrade_choices['Increase Projectile Speed']
 
-    def enable_mouse_aiming(self):
-        self.mouse_aiming = True
+    def enable_mouse_aim(self):
+        self.mouse_aim = True
         del self.upgrade_choices['Enable Mouse Aiming']
+        self.upgrade_choices["Enable Auto Aim"] = self.enable_auto_aim
+
+    def enable_auto_aim(self):
+        self.mouse_aim = False
+        self.auto_aim = True
+        del self.upgrade_choices['Enable Auto Aim']
 
     def reduce_spread(self, amount = 1):
         self.spread += 1
         if self.spread >= 12:
             del self.upgrade_choices['Reduce Spread']
+    
+    def increase_projectiles(self, amount = 1):
+        self.projectile_count += amount
+        if self.projectile_count >= 8:
+            del self.upgrade_choices['Increase Projectiles']
+
+    def increase_rof(self, amount = 1):
+        self.fire_rate -= amount  # Minimum fire rate is 2
+        if self.fire_rate <= 2:
+            del self.upgrade_choices["Increase Rate of Fire"]
+    
+    def heal(self, amount):
+        self.health = min(PLAYER_MAX_HEALTH, self.health + amount)
     
     def draw(self):
         pygame.draw.circle(screen, PLAYER_COLOR, (PLAYER_POS[0], PLAYER_POS[1]), PLAYER_RADIUS)
@@ -211,17 +234,22 @@ class Player:
 
     def level_up(self): #TODO balance xp level requirements
         self.level += 1
-        self.xp_thresh += XP_THRESH_CONSTANT * self.level  # Increase threshold by 10 for each level
+        self.xp_thresh = self.xp_thresh + XP_THRESH_CONSTANT * self.level * self.xp_thresh_mult//2 # Increase threshold by CONSTANT for each level
         self.upgrade_screen()
         self.draw_stats()
 
     def upgrade_screen(self):
         # Present upgrade choices
+        choices = sorted(random.sample(list(self.upgrade_choices.keys()),min(3,len(self.upgrade_choices.keys()))))
+        if len(choices) == 1:
+            self.upgrade_choices[choices[0]]()
+            return
+
         screen.fill(WHITE)
         pygame.display.flip()
         upgrade_text = font.render("Choose an upgrade:", True, BLACK)
         screen.blit(upgrade_text, (WIDTH // 2 - upgrade_text.get_width() // 2, HEIGHT // 2 - 100))
-        choices = sorted(random.sample(list(self.upgrade_choices.keys()),3))
+        
         for i, choice in enumerate(choices):
             choice_text = font.render(f'{i+1}: {choice}', True, BLACK)
             screen.blit(choice_text, (WIDTH // 2 - choice_text.get_width() // 2, HEIGHT // 2 + i * 30))
@@ -230,45 +258,19 @@ class Player:
         
         # Wait for player to choose an upgrade
         chosen = False
-        while not chosen: #TODO update to only accept key press in the range of the number of choices
+
+        keys = [pygame.K_1, pygame.K_2, pygame.K_3]
+
+        key_choices = {key: i for i, key in enumerate(keys[:len(choices)])}
+
+        # key_choices = {pygame.K_1: 1, pygame.K_2: 2, pygame.K_3: 3}
+
+        while not chosen: 
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
-                    match event.key:
-                        case pygame.K_1:
-                            self.upgrade_choices[choices[0]]()
-                            chosen = True
-                        case pygame.K_2:
-                            self.upgrade_choices[choices[1]]()
-                            chosen = True
-                        case pygame.K_3:
-                            self.upgrade_choices[choices[2]]()
-                            chosen = True
-                        # case pygame.K_4:
-                        #     self.increase_pierce()
-                        #     chosen = True
-                        # case pygame.K_5:
-                        #     self.increase_projectile_speed()
-                        #     chosen = True
-                        # case pygame.K_6:
-                        #     self.enable_mouse_aiming()
-                        #     chosen = True
-                        # case pygame.K_7:
-                        #     self.reduce_spread()
-                        #     chosen = True
-
-    
-    def increase_projectiles(self, amount = 1):
-        self.projectile_count += amount
-        if self.projectile_count >= 10:
-            del self.upgrade_choices['Increase Projectiles']
-
-    def increase_rof(self, amount = 1):
-        self.fire_rate -= amount  # Minimum fire rate is 5
-        if self.fire_rate <= 2:
-            del self.upgrade_choices["Increase Rate of Fire"]
-    
-    def heal(self, amount):
-        self.health = min(PLAYER_MAX_HEALTH, self.health + amount)
+                    if event.key in key_choices:
+                        self.upgrade_choices[choices[key_choices[event.key]]]()
+                        chosen = True
 
 # Function to draw the solid spiral path
 def draw_spiral_path():
@@ -277,11 +279,39 @@ def draw_spiral_path():
         radius = ENEMY_START_RADIUS - SPIRAL_SPEED * i
         if radius > 0:
             x, y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], radius, i * ENEMY_SPEED)
-            points.append((int(x), int(y)))
+            points.append((x, y))
 
     # Draw the spiral path as a continuous line
     if len(points) > 1:
         pygame.draw.lines(screen, BLUE, False, points, 1)
+
+def intercept(bullet_speed, enemy):
+    dt = enemy.radius / bullet_speed
+    # dy = 
+    # dt2 = (enemy.radius - dt*enemy.spiral_speed) / bullet_speed
+
+    x1a = enemy.angle+enemy.speed*dt
+    # print(f'Intercept Angle: {x1a}')
+    # x1r = enemy.radius*dt2*60
+
+    return x1a
+
+def get_closest_enemy(enemies):
+    if len(enemies) == 0:
+        return -1
+    min_dist = float('inf')
+    min_dist_index = 0
+    for i in range(len(enemies)):
+        x, y = get_position_on_spiral(PLAYER_POS[0], PLAYER_POS[1], enemies[i].radius, enemies[i].angle)
+        distance = math.hypot(x - PLAYER_POS[0], y - PLAYER_POS[1])
+        if distance < min_dist:
+            min_dist = distance
+            min_dist_index = i
+    # print(f'Enemy Color: {enemies[min_dist_index].color}')
+    # print(f'Enemy Health: {enemies[min_dist_index].health}')
+    # print(f'Enemy Angle: {enemies[min_dist_index].angle}')
+    return min_dist_index
+
 
 # Setup
 player = Player()
@@ -297,11 +327,19 @@ SCORE = 0
 while running:
     minute = frame_count // 3600
     second = (frame_count // 60) % 60
-    SPAWN_RATE = 60-2*minute
+
+    player.xp_thresh_mult = max(1, minute)
+
+    if minute == 15:
+        print(f'Level:{player.level}')
+        print(f'Score: {SCORE}')
+        break # TODO replace with game over you win screen
+
+    SPAWN_RATE = 60-3*minute
     
-    # Every 30 seconds, double the health of new enemies
-    if ((frame_count // 60) % 60) % 30 == 0:
-        ENEMY_HEALTH_MULTIPLIER *= 2
+    # # Every 30 seconds, double the health of new enemies
+    # if ((frame_count // 60) % 60) % 30 == 0:
+    #     ENEMY_HEALTH_MULTIPLIER *= 2
 
     screen.fill(WHITE)
     
@@ -316,12 +354,23 @@ while running:
     # Shoot bullets automatically at a fixed rate
     if frame_count % player.fire_rate == 0:
         mx, my = pygame.mouse.get_pos()
-        angle = random.uniform(0, 2 * math.pi) if not player.mouse_aiming else math.atan2(my - PLAYER_POS[1], mx - PLAYER_POS[0])+math.pi*2 # angle to fire bullets
+        angle = 0.0
+        
+        if player.mouse_aim:
+            angle = math.atan2(my - PLAYER_POS[1], mx - PLAYER_POS[0])+math.pi*2
+        elif player.auto_aim:
+            closest_enemy = get_closest_enemy(enemies)
+            angle = 0 if closest_enemy == -1 else intercept(player.projectile_speed, enemies[closest_enemy])
+        else:
+            angle = random.uniform(0, 2 * math.pi)
+
+        # angle =  if not player.mouse_aim else  # angle to fire bullets
         angles = [angle+(2*p*math.pi/player.projectile_count)*(1/player.spread) for p in range(player.projectile_count)]
-        if player.mouse_aiming:
-            offset = (max(angles)-min(angles))/2
+        if player.mouse_aim or player.auto_aim:
+            # offset = (max(angles)-min(angles))/2
+            offset = angles[-1] - angles[len(angles)//2]
             for i in range(len(angles)):
-                angles[i]-=offset
+                angles[i]+=2*math.pi-offset
         for p in range(player.projectile_count):
             bullets.append(
                 Bullet(PLAYER_POS[0], PLAYER_POS[1], angles[p],
@@ -329,7 +378,7 @@ while running:
 
     # Spawn new enemies at the end of the spiral path
     if frame_count % SPAWN_RATE == 0:
-        new_enemy = Enemy(0, ENEMY_START_RADIUS, 10*(minute+1))
+        new_enemy = Enemy(0, ENEMY_START_RADIUS, 2**minute)
         enemies.append(new_enemy)
 
     frame_count += 1
@@ -371,7 +420,7 @@ while running:
     # Draw player
     player.draw()
 
-    # Draw score
+    # Draw score and timer
     score_text = font.render(f"Score: {SCORE}", True, BLACK)
     time_text = font.render(f"Time: {minute}:{0 if second < 10 else ''}{second}", True, BLACK)
     screen.blit(score_text, (10, 10))
