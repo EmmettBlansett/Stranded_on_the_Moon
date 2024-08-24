@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 import os
+import sys
 
 from player import Player
 from enemy import Enemy
@@ -69,6 +70,12 @@ def get_closest_enemy(enemies):
             min_dist_index = i
     return min_dist_index
 
+def model_aim(screen, image, angle, topleft=(CENTER_X-20, CENTER_Y-20)):
+    #point the image toward the angle
+    rotated_image = pygame.transform.rotate(image, -angle*180/math.pi)
+    new_rect = rotated_image.get_rect(center = image.get_rect(topleft = topleft).center)
+    screen.blit(rotated_image, new_rect)
+
 def pause(screen, font):
     pause_message = 'PAUSED'
     pause_text = font.render(pause_message, True, WHITE)
@@ -80,6 +87,7 @@ def pause(screen, font):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
+                sys.exit()
                 paused = False
                 break
             elif event.type == pygame.KEYDOWN:
@@ -92,6 +100,7 @@ def game_over(win, score, minutes, seconds, screen, font):
     game_over_text = font.render(game_over_message, True, WHITE)
     survived_text = font.render(f"You survived for {minutes}:{0 if seconds < 10 else ''}{seconds}", True, WHITE)
     score_text = font.render(f'SCORE: {score}', True, WHITE)
+    choice_text = font.render(f'(E)XIT or (R)ETRY', True, WHITE)
 
     text_spacer = 50
 
@@ -99,6 +108,7 @@ def game_over(win, score, minutes, seconds, screen, font):
     screen.blit(score_text, ((WIDTH//2-score_text.get_width()//2, HEIGHT//2-score_text.get_height()//2)))
     screen.blit(game_over_text, (WIDTH//2-game_over_text.get_width()//2, HEIGHT//2 - score_text.get_height()//2 - text_spacer))
     screen.blit(survived_text, (WIDTH//2-survived_text.get_width()//2, HEIGHT//2 - score_text.get_height()//2 + text_spacer))
+    screen.blit(choice_text, (WIDTH//2-choice_text.get_width()//2, HEIGHT//2 - score_text.get_height() + 2*text_spacer))
 
     pygame.display.flip()
 
@@ -108,11 +118,13 @@ def game_over(win, score, minutes, seconds, screen, font):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
+                sys.exit()
                 acknowledged = True
                 break
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_e:
                     pygame.quit()
+                    sys.exit()
                     acknowledged = True
                     break
                 elif event.key ==  pygame.K_r:
@@ -141,7 +153,9 @@ def game_loop(first_try = True):
 
     player = Player(font=font,screen=screen)
     enemy = Enemy(0,0)
+
     if first_try:
+        Player.models = [pygame.image.load(player_fn) for player_fn in Player.models]
         Enemy.enemy_types = [pygame.image.load(enemy_fn) for enemy_fn in Enemy.enemy_types]
     enemies = []
     bullets = []
@@ -164,10 +178,6 @@ def game_loop(first_try = True):
 
         if frame_count and frame_count % 60 == 0:
             second += 1
-            if second > 5:
-                game_over(False, score, minute, second, screen, font)
-                running = False
-                break
             if second == 60:
                 second = 0
 
@@ -201,14 +211,22 @@ def game_loop(first_try = True):
                 angle = 0 if closest_enemy == -1 else intercept_angle(player.projectile_speed, enemies[closest_enemy])
             else:
                 angle = random.uniform(0, 2*math.pi)
+            player.angle = angle
+            # model_aim(screen, Player.models[player.model],angle)
 
             # angle =  if not player.mouse_aim else  # angle to fire bullets
             angles = [angle+(2*p*math.pi/player.projectile_count)*(1/player.spread) for p in range(player.projectile_count)]
+            center_offset = (max(angles)-min(angles))/2
             if player.targeting:
                 # offset = (max(angles)-min(angles))/2
-                offset = angles[-1] - angles[len(angles)//2]
+                offset = (angles[-1] - angles[len(angles)//2]) if player.targeting == 2 else center_offset
+                if player.targeting == 2 and player.projectile_count > 1:
+                    player.angle += center_offset/(player.projectile_count-1) * (1-player.projectile_count%2)
                 for i in range(len(angles)):
                     angles[i]+=2*math.pi-offset
+            else:
+                player.angle += center_offset
+
             for p in range(player.projectile_count):
                 bullets.append(
                     Bullet(CENTER_X, CENTER_Y, angles[p],
@@ -232,6 +250,17 @@ def game_loop(first_try = True):
         for enemy in enemies[:]:
             enemy.move()
             enemy.draw(screen)
+            
+            # Check if enemy touches the player
+            if enemy.check_player_collision(player.radius):
+                player.take_damage(enemy.health)
+                enemies.remove(enemy)
+                if player.health <= 0:
+                    game_over(False, score, minute, second, screen, font)
+                    running = False
+                    # break
+                continue
+
             # Check for collision with bullets
             for bullet in bullets[:]:
                 if enemy.check_collision(bullet):
@@ -246,21 +275,19 @@ def game_loop(first_try = True):
                         player.gain_xp(enemy.value)  # Gain XP based on enemy's original health
                         # enemy.on_death(player)
                         enemies.remove(enemy)
-                    break
-            # Check if enemy touches the player
-            if enemy.check_player_collision(player.radius):
-                player.health -= enemy.health
-                enemies.remove(enemy)
-                if player.health <= 0:
-                    game_over(False, score, minute, second, screen, font)
-                    running = False
+                        break
+                    # break
 
         # Draw player
-        player.draw()
+        # player.draw(screen)
+        model_aim(screen, Player.models[player.model],player.angle)
+        player.draw_health(screen)
         player.draw_stats()
+
         if minute == TIME_LIMIT:
-                    game_over(True, score, minute, second, screen, font)
-                    running = False
+            game_over(True, score, minute, second, screen, font)
+            running = False
+            break
 
         # Handle events
         for event in pygame.event.get():
@@ -277,6 +304,7 @@ def game_loop(first_try = True):
         clock.tick(60)
     # Quit the game
     pygame.quit()
+    sys.exit()
 
 if __name__ == '__main__':
     game_loop()
