@@ -36,7 +36,7 @@ def get_enemies_dir():
     return enemy_dir
 
 class Enemy:
-    enemy_types = [os.path.join(get_enemies_dir(), enemy) for enemy in os.listdir(get_enemies_dir())]
+    enemy_types = [pygame.image.load(os.path.join(get_enemies_dir(), enemy)) for enemy in os.listdir(get_enemies_dir())]
     def __init__(self, angle, radius, health = ENEMY_HEALTH * ENEMY_HEALTH_MULTIPLIER, speed = ENEMY_SPEED, spiral_speed = SPIRAL_SPEED, color = ENEMY_COLOR):
         self.angle = angle
         self.radius = radius
