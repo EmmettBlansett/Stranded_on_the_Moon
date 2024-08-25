@@ -2,6 +2,7 @@ import pygame
 import random
 import os
 import sys
+import time
 
 from constants import WIDTH,HEIGHT,WHITE,BLACK,RED,GREEN,BLUE,YELLOW
 from level_up_screen import LevelUpScreen
@@ -246,3 +247,5 @@ class Player:
                             break
             level_screen.draw()
             pygame.display.flip()
+            time.sleep(1/60)
+
