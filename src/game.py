@@ -192,7 +192,7 @@ def game_loop(first_try = True):
 
     while running:
         minute, second = update_time(frame_count, minute, second)
-        phase = min(7, minute//2)
+        phase = min(len(PATH_BGS)-1, minute//2)
 
         player.xp_thresh_mult = max(1, minute)
 
