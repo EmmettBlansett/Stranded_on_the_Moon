@@ -3,13 +3,15 @@ import math
 import random
 import os
 import sys
+import time
 
 from player import Player
 from enemy import Enemy
 from bullet import Bullet
+from menu import Menu, Button
 
 # Constants
-from constants import WIDTH, HEIGHT, WHITE, BLACK
+from constants import WIDTH, HEIGHT, WHITE, LIGHTGRAY, GRAY, DARKGRAY, BLACK
 
 # Screen dimensions
 CENTER_X, CENTER_Y = WIDTH//2, HEIGHT//2
@@ -20,6 +22,7 @@ ENEMY_SIZE = 36
 
 # Timer and XP system
 TIME_LIMIT = 20
+TIME_WARP_MULT = 1
 XP = 0
 LEVEL = 1
 XP_THRESH = 10  # Initial XP threshold
@@ -71,32 +74,6 @@ def model_aim(screen, image, angle, topleft=(CENTER_X-20, CENTER_Y-20)):
     new_rect = rotated_image.get_rect(center = image.get_rect(topleft = topleft).center)
     screen.blit(rotated_image, new_rect)
 
-def pause(screen, font, player):
-    pause_message = 'PAUSED'
-    pause_text = font.render(pause_message, True, WHITE)
-    screen.fill(BLACK, (WIDTH//2-200, HEIGHT//2-200, 400, 400))
-    screen.blit(pause_text, (WIDTH//2-pause_text.get_width()//2,HEIGHT//2-pause_text.get_height()))
-    pygame.display.flip()
-    paused = True
-    while paused:
-        # Handle showing stats while paused
-        if pygame.key.get_pressed()[pygame.K_TAB]:
-            screen.fill(BLACK,(WIDTH-200,0,200,150))
-            player.draw_stats()
-        else:
-            screen.fill(BLACK,(WIDTH-200,0,200,150))
-        pygame.display.flip()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-                paused = False
-                break
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    paused = False
-                    break
-
 def game_over(win, score, minutes, seconds, screen, font):
     game_over_message = 'GAME OVER!!!' if not win else 'YOU WIN!!!'
     game_over_text = font.render(game_over_message, True, WHITE)
@@ -117,6 +94,7 @@ def game_over(win, score, minutes, seconds, screen, font):
     acknowledged = False
     retry = False
     while not acknowledged:
+        time.sleep(1/60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -173,6 +151,11 @@ def get_angles(player, targeting, mx = 0, my = 0, intercept_angle = 0):
 
     return (player_angle, angles)
 
+def get_asset_file(folder, file):
+    game_dir = os.path.dirname(os.path.dirname(__file__))
+    asset_dir = os.path.join(game_dir,'assets')
+    return os.path.join(asset_dir, f'{folder}\\{file}')
+
 def game_loop(first_try = True):
 
     pygame.init()
@@ -208,7 +191,6 @@ def game_loop(first_try = True):
     #TODO add animations class (frame, duration, update(), draw())
 
     while running:
-
         minute, second = update_time(frame_count, minute, second)
         phase = min(7, minute//2)
 
@@ -246,8 +228,6 @@ def game_loop(first_try = True):
         if frame_count % spawn_rate == 0:
             new_enemy = Enemy(0, PATH_RADIUS-ENEMY_SIZE//2, 2**minute)
             enemies.append(new_enemy)
-
-        frame_count += 1
 
         # Move and draw bullets
         for bullet in bullets[:]:
@@ -308,16 +288,90 @@ def game_loop(first_try = True):
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    pause(screen, font, player)
+                    pause(screen)
+        
+        frame_count += 1
         
         # Update display
         pygame.display.flip()
 
         # Cap the frame rate
-        clock.tick(60)
+        clock.tick(60 * TIME_WARP_MULT)
+
+
     # Quit the game
     pygame.quit()
     sys.exit()
 
+def main_menu():
+
+    pygame.init()
+
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Stranded on the Moon")
+
+    # Fonts
+    font = pygame.font.SysFont(None, 24)
+
+    menu_button_width = 200
+    menu_button_height = 50
+
+    bg_image = get_asset_file('menu_background', 'stranded_on_the_moon.png')
+
+    main_menu = Menu(screen,'Stranded on the Moon',font,0,0,WIDTH,HEIGHT,LIGHTGRAY,bg_image)
+    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+200,menu_button_width,menu_button_height,font,text='PLAY',func=game_loop)
+    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+300,menu_button_width,menu_button_height,font,text='EXIT',func=pygame.quit)
+
+    action = None
+    while not action:
+        mouse_pos = pygame.mouse.get_pos()
+        main_menu.handle_mouse_hover(mouse_pos)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    selected_button = main_menu.handle_mouse_click(mouse_pos)
+                    if selected_button>-1:
+                        action = main_menu.buttons[selected_button].func
+        main_menu.draw()
+        pygame.display.flip()
+        time.sleep(1/60)
+    action()
+
+def pause(screen):
+    # Fonts
+    font = pygame.font.SysFont(None, 24)
+
+    menu_button_width = 200
+    menu_button_height = 50
+
+    pause_menu = Menu(screen,'PAUSED',font,WIDTH//4,HEIGHT//4,WIDTH//2,HEIGHT//2,BLACK)
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10-menu_button_height,menu_button_width,menu_button_height,font,text='RESUME')
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10,menu_button_width,menu_button_height,font,text='QUIT',func=sys.exit)
+
+    paused = True
+    while paused:
+
+        mouse_pos = pygame.mouse.get_pos()
+        pause_menu.handle_mouse_hover(mouse_pos)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    selected_button = pause_menu.handle_mouse_click(mouse_pos)
+                    if selected_button>-1:
+                        action = pause_menu.buttons[selected_button].func
+                        paused = False
+        pause_menu.draw()
+        pygame.display.flip()
+        time.sleep(1/60)
+    action()
+
 if __name__ == '__main__':
-    game_loop()
+    main_menu()
