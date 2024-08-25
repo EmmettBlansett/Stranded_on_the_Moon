@@ -8,7 +8,7 @@ import time
 from player import Player
 from enemy import Enemy
 from bullet import Bullet
-from menu import Menu, Button
+from menu import Menu
 
 # Constants
 from constants import WIDTH, HEIGHT, WHITE, LIGHTGRAY, GRAY, DARKGRAY, BLACK
@@ -74,46 +74,6 @@ def model_aim(screen, image, angle, topleft=(CENTER_X-20, CENTER_Y-20)):
     new_rect = rotated_image.get_rect(center = image.get_rect(topleft = topleft).center)
     screen.blit(rotated_image, new_rect)
 
-def game_over(win, score, minutes, seconds, screen, font):
-    game_over_message = 'GAME OVER!!!' if not win else 'YOU WIN!!!'
-    game_over_text = font.render(game_over_message, True, WHITE)
-    survived_text = font.render(f"You survived for {minutes}:{0 if seconds < 10 else ''}{seconds}", True, WHITE)
-    score_text = font.render(f'SCORE: {score}', True, WHITE)
-    choice_text = font.render(f'(E)XIT or (R)ETRY', True, WHITE)
-
-    text_spacer = 50
-
-    screen.fill(BLACK, (WIDTH//2-200, HEIGHT//2-200, 400, 400))
-    screen.blit(score_text, ((WIDTH//2-score_text.get_width()//2, HEIGHT//2-score_text.get_height()//2)))
-    screen.blit(game_over_text, (WIDTH//2-game_over_text.get_width()//2, HEIGHT//2 - score_text.get_height()//2 - text_spacer))
-    screen.blit(survived_text, (WIDTH//2-survived_text.get_width()//2, HEIGHT//2 - score_text.get_height()//2 + text_spacer))
-    screen.blit(choice_text, (WIDTH//2-choice_text.get_width()//2, HEIGHT//2 - score_text.get_height() + 2*text_spacer))
-
-    pygame.display.flip()
-
-    acknowledged = False
-    retry = False
-    while not acknowledged:
-        time.sleep(1/60)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-                acknowledged = True
-                break
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_e:
-                    pygame.quit()
-                    sys.exit()
-                    acknowledged = True
-                    break
-                elif event.key ==  pygame.K_r:
-                    acknowledged = True
-                    retry = True
-                    break
-    if retry:
-        game_loop(first_try = False)
-
 def get_phase_dir():
     prev_dir = os.path.dirname(os.path.dirname(__file__))
     enemy_dir = os.path.join(prev_dir,'assets\\phases')
@@ -156,23 +116,21 @@ def get_asset_file(folder, file):
     asset_dir = os.path.join(game_dir,'assets')
     return os.path.join(asset_dir, f'{folder}\\{file}')
 
-def game_loop(first_try = True):
-
-    pygame.init()
+def game_loop():
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Spiral Shooter")
 
     # Fonts
-    font = pygame.font.SysFont(None, 24)
+    # font = pygame.font.SysFont(None, 24)
+    font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 16)
+    stat_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 12)
+
 
     # Setup
     PATH_BGS = [pygame.image.load(os.path.join(get_phase_dir(),phase)).convert_alpha() for phase in os.listdir(get_phase_dir())]
-    player = Player(font=font,screen=screen)
+    player = Player(game_font=font,stat_font=stat_font,screen=screen)
     enemy = Enemy(0,0)
-    if first_try:
-        Player.models = [pygame.image.load(player_fn) for player_fn in Player.models]
-        Enemy.enemy_types = [pygame.image.load(enemy_fn) for enemy_fn in Enemy.enemy_types]
 
     enemies = []
     bullets = []
@@ -188,6 +146,7 @@ def game_loop(first_try = True):
 
     phase = 0
 
+    time_pos_offset = font.render(f"Time: 0:00", True, WHITE).get_width()//2
     #TODO add animations class (frame, duration, update(), draw())
 
     while running:
@@ -207,7 +166,7 @@ def game_loop(first_try = True):
         score_text = font.render(f"Score: {score}", True, WHITE)
         time_text = font.render(f"Time: {minute}:{0 if second < 10 else ''}{second}", True, WHITE)
         screen.blit(score_text, (10, 10))
-        screen.blit(time_text, (WIDTH // 2 - 40, 10))
+        screen.blit(time_text, (WIDTH // 2 - time_pos_offset, 10))
 
         # Shoot bullets automatically at fire rate
         if frame_count % player.fire_rate == 0:
@@ -247,8 +206,10 @@ def game_loop(first_try = True):
                 enemies.remove(enemy)
                 draw = False
                 if player.health <= 0:
-                    game_over(False, score, minute, second, screen, font)
+                    game_over(screen, False, score)
                     running = False
+                    break
+                continue
             # Check for collision with bullets
             for bullet in bullets:
                 if enemy.check_collision(bullet):
@@ -278,7 +239,7 @@ def game_loop(first_try = True):
         player.gain_xp(xp_gained)  # Gain XP based on enemy's original health
 
         if minute == TIME_LIMIT:
-            game_over(True, score, minute, second, screen, font)
+            game_over(screen, True, score)
             running = False
             break
 
@@ -311,16 +272,17 @@ def main_menu():
     pygame.display.set_caption("Stranded on the Moon")
 
     # Fonts
-    font = pygame.font.SysFont(None, 24)
+    title_font = pygame.font.Font(get_asset_file('fonts','Monoton-Regular.ttf'), 50)
+    button_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 24)
 
     menu_button_width = 200
     menu_button_height = 50
 
     bg_image = get_asset_file('menu_background', 'stranded_on_the_moon.png')
 
-    main_menu = Menu(screen,'Stranded on the Moon',font,0,0,WIDTH,HEIGHT,LIGHTGRAY,bg_image)
-    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+200,menu_button_width,menu_button_height,font,text='PLAY',func=game_loop)
-    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+300,menu_button_width,menu_button_height,font,text='EXIT',func=pygame.quit)
+    main_menu = Menu(screen,'Stranded   on   the   Moon',title_font,0,0,WIDTH,HEIGHT,LIGHTGRAY,bg_image)
+    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+200,menu_button_width,menu_button_height,button_font,text='PLAY',func=game_loop)
+    main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+300,menu_button_width,menu_button_height,button_font,text='EXIT',func=pygame.quit)
 
     action = None
     while not action:
@@ -343,14 +305,14 @@ def main_menu():
 
 def pause(screen):
     # Fonts
-    font = pygame.font.SysFont(None, 24)
+    font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 16)
 
     menu_button_width = 200
     menu_button_height = 50
 
     pause_menu = Menu(screen,'PAUSED',font,WIDTH//4,HEIGHT//4,WIDTH//2,HEIGHT//2,BLACK)
-    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10-menu_button_height,menu_button_width,menu_button_height,font,text='RESUME')
-    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10,menu_button_width,menu_button_height,font,text='QUIT',func=sys.exit)
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10,menu_button_width,menu_button_height,font,text='RESUME')
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10+menu_button_height,menu_button_width,menu_button_height,font,text='QUIT',func=sys.exit)
 
     paused = True
     while paused:
@@ -369,6 +331,40 @@ def pause(screen):
                         action = pause_menu.buttons[selected_button].func
                         paused = False
         pause_menu.draw()
+        pygame.display.flip()
+        time.sleep(1/60)
+    action()
+
+def game_over(screen, win):
+    title_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 24)
+    button_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 16)
+
+    menu_button_width = 200
+    menu_button_height = 50
+
+    title = 'YOU WIN!!' if win else 'GAME OVER!!'
+
+    game_over_menu = Menu(screen,title,title_font,WIDTH//4,HEIGHT//4,WIDTH//2,HEIGHT//2,BLACK)
+    game_over_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10,menu_button_width,menu_button_height,button_font,text='RETRY',func = game_loop)
+    game_over_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10+menu_button_height,menu_button_width,menu_button_height,button_font,text='EXIT',func=sys.exit)
+
+    acknowledged = False
+    while not acknowledged:
+
+        mouse_pos = pygame.mouse.get_pos()
+        game_over_menu.handle_mouse_hover(mouse_pos)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    selected_button = game_over_menu.handle_mouse_click(mouse_pos)
+                    if selected_button>-1:
+                        action = game_over_menu.buttons[selected_button].func
+                        acknowledged = True
+        game_over_menu.draw()
         pygame.display.flip()
         time.sleep(1/60)
     action()
