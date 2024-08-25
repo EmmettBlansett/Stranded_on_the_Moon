@@ -46,12 +46,12 @@ def get_player_dir():
     return player_dir
 
 class Player:
-    models = [os.path.join(get_player_dir(), fn) for fn in os.listdir(get_player_dir())]
+    models = [pygame.image.load(os.path.join(get_player_dir(), fn)) for fn in os.listdir(get_player_dir())]
     def __init__(self, max_health = PLAYER_MAX_HEALTH, health = PLAYER_MAX_HEALTH, 
                  rof = FIRE_RATE, projectile_count = PLAYER_PROJECTILES, pierce = PIERCE,
                  xp = XP, level = LEVEL, xp_thresh = XP_THRESH, xp_thresh_mult = XP_THRESH_MULT,
                  damage = BULLET_DAMAGE, speed = BULLET_SPEED, targeting = 0, spread = PROJECTILE_SPREAD, 
-                 radius = PLAYER_RADIUS,font = None,screen = None,model=0, angle = 0):
+                 radius = PLAYER_RADIUS, game_font = None, stat_font = None, screen = None,model=0, angle = 0):
         self.max_health = max_health
         self.health = health
         self.fire_rate = rof
@@ -72,7 +72,8 @@ class Player:
                                   "Damage":self.increase_damage, "Pierce": self.increase_pierce, 
                                   "Velocity":self.increase_projectile_speed, "Manual Aiming":self.enable_mouse_aim,
                                   "Reduce Spread":self.reduce_spread}
-        self.font = font
+        self.font = game_font
+        self.stat_font = stat_font
         self.radius = radius
         self.maxxed = [False] * 8
 
@@ -182,9 +183,9 @@ class Player:
                      f'Damage: {self.damage}',f'Fire Rate: {3600//self.fire_rate}',
                      f'Pierce: {self.pierce}',f'Spread: {360 // self.spread}',
                      f'Velocity: {self.projectile_speed}',f'Targeting: {targeting_sys[self.targeting]}']
-        max_text = [self.font.render('(MAX) '*self.maxxed[i], True, GREEN) for i in range(len(stat_text))]
+        max_text = [self.stat_font.render('(MAX) '*self.maxxed[i], True, GREEN) for i in range(len(stat_text))]
 
-        stats = [self.font.render(stat_text[i], True, WHITE) for i in range(len(stat_text))]
+        stats = [self.stat_font.render(stat_text[i], True, WHITE) for i in range(len(stat_text))]
         
         top_margin = 10
         right_margin = 10
