@@ -1,5 +1,7 @@
 # Stranded on the Moon
 
+![image](https://github.com/user-attachments/assets/732aa364-882d-4def-b991-a1e8565ed9b3)
+
 Welcome to Stranded on the Moon! Follow the instructions below to get started.
 
 ## Prerequisites
