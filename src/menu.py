@@ -21,6 +21,9 @@ class Menu:
             self.screen.blit(self.bg_image,(self.rect.x,self.rect.y))
         else:
             self.screen.fill(self.bg_color, (self.rect))
+
+        title_text = self.font.render(self.menu_title, True, YELLOW)
+        self.screen.blit(title_text, (self.rect.centerx-title_text.get_width()//2,self.rect.y+self.rect.height//5-title_text.get_height()))
             
         for button in self.buttons:
             button.draw(self.screen)
@@ -39,10 +42,6 @@ class Menu:
 class Button:
     def __init__(self, screen, x, y, width, height, font, text = '', func = lambda: None, text_color = BLACK, bg_color = GRAY, pressed_color = DARKGRAY):
         self.rect = pygame.Rect(x, y, width, height)
-        # self.x = x
-        # self.y = y
-        # self.width = width
-        # self.height = height
         self.screen = screen
         self.font = font
         self.text = text
