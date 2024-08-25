@@ -1,30 +1,15 @@
 @echo off
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Python is not installed. Please install Python to run this game.
+if not exist .venv (
+    echo The virtual environment has not been set up.
+    echo Please run setup.bat first to create the environment and install dependencies.
     pause
     exit /b
 )
 
-if not exist venv (
-    echo Creating virtual environment...
-    python -m venv .venv
-)
-
 call .venv\Scripts\activate
-
-python -c "import pygame" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Installing dependencies for the first time...
-    pip install -r requirements.txt
-    echo Requirements installed.
-    echo done
-) else (
-    echo Dependencies are already installed.
-)
 
 echo Starting the game...
 python src\game.py
 
 echo Done!
-exit
+pause
