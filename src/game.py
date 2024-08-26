@@ -305,14 +305,15 @@ def main_menu():
 
 def pause(screen):
     # Fonts
-    font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 16)
+    title_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 24)
+    button_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 16)
 
     menu_button_width = 200
     menu_button_height = 50
 
-    pause_menu = Menu(screen,'PAUSED',font,WIDTH//4,HEIGHT//4,WIDTH//2,HEIGHT//2,BLACK)
-    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10,menu_button_width,menu_button_height,font,text='RESUME')
-    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10+menu_button_height,menu_button_width,menu_button_height,font,text='QUIT',func=sys.exit)
+    pause_menu = Menu(screen,'PAUSED',title_font,WIDTH//4,HEIGHT//4,WIDTH//2,HEIGHT//2,BLACK)
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y-10,menu_button_width,menu_button_height,button_font,text='RESUME')
+    pause_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+10+menu_button_height,menu_button_width,menu_button_height,button_font,text='QUIT',func=sys.exit)
 
     paused = True
     while paused:
