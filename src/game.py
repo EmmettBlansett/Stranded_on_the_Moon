@@ -272,7 +272,7 @@ def main_menu():
     pygame.display.set_caption("Stranded on the Moon")
 
     # Fonts
-    title_font = pygame.font.Font(get_asset_file('fonts','Monoton-Regular.ttf'), 50)
+    title_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 50)
     button_font = pygame.font.Font(get_asset_file('fonts','Silkscreen-Regular.ttf'), 24)
 
     menu_button_width = 200
@@ -280,7 +280,9 @@ def main_menu():
 
     bg_image = get_asset_file('menu_background', 'stranded_on_the_moon.png')
 
-    main_menu = Menu(screen,'Stranded   on   the   Moon',title_font,0,0,WIDTH,HEIGHT,LIGHTGRAY,bg_image)
+    title = ''
+
+    main_menu = Menu(screen,title,title_font,0,0,WIDTH,HEIGHT,LIGHTGRAY,bg_image)
     main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+200,menu_button_width,menu_button_height,button_font,text='PLAY',func=game_loop)
     main_menu.add_button(screen,CENTER_X-menu_button_width//2,CENTER_Y+300,menu_button_width,menu_button_height,button_font,text='EXIT',func=pygame.quit)
 

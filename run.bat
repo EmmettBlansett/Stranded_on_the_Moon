@@ -12,4 +12,4 @@ echo Starting the game...
 python src\game.py
 
 echo Done!
-pause
+exit
